@@ -1,0 +1,36 @@
+# Virtual environment
+venv/
+
+# ADK runtime session data
+**/.adk/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables / secrets
+.env
+.env.*
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage reports
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Scripts output / scratch
+scripts/__pycache__/

@@ -1,0 +1,17 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+.git/
+.gitignore
+.vscode/
+.pytest_cache/
+*.log
+*.egg-info/
+tests/
+scripts/
+hello_agent/
+replace_html.py
+replace_ui.py
+AEGIS.md
