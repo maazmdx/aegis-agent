@@ -27,15 +27,62 @@ All of this happens in the background, driven by the agent — not by hard-coded
 
 ```mermaid
 flowchart LR
-    A[Agent Fleet<br/>fleet.py / trigger.py] -->|events| P[(Pub/Sub<br/>fleet-events)]
-    P -->|push| D[Detector<br/>Cloud Run + Flask]
-    D -->|classify + save| F[(Firestore<br/>incidents / quarantine)]
-    S[Aegis Supervisor<br/>Google ADK + Gemini] -->|read open incidents| F
-    S -->|diagnose / decide / remediate / postmortem| F
-    F --> W[Fleet Dashboard<br/>Cloud Run + Flask]
+    subgraph Fleet["Monitored Agent Fleet"]
+      A1[Worker Agent A]
+      A2[Worker Agent B]
+      A3[Worker Agent C]
+    end
+    Fleet -->|emit events| PS[(Pub/Sub<br/>fleet-events)]
+    PS -->|push| DET[Detector<br/>Cloud Run + Flask]
+    PS -.dead-letter.-> DLQ[(fleet-events-dead)]
+    DET -->|classify + persist| FS[(Firestore<br/>incidents / quarantine)]
+    SUP[Aegis Supervisor<br/>Google ADK + Gemini 3.6]
+    SUP -->|1. get_open_incidents| FS
+    SUP -->|2. diagnose| GEM[Gemini API]
+    SUP -->|3. decide_action| POL{Policy Engine}
+    POL -->|4. remediate| FS
+    SUP -->|5. write_postmortem| FS
+    FS --> DASH[Fleet Dashboard<br/>Cloud Run + Flask + Chart.js]
+    SEC[Secret Manager<br/>gemini-api-key] -.-> SUP
+    SEC -.-> DET
 ```
 
 **Flow:** worker agents emit events → Pub/Sub → the **detector** (a Pub/Sub push endpoint) classifies and stores incidents in Firestore → the **Aegis supervisor** (an ADK `LlmAgent` with tools) triages every open incident → the **dashboard** shows the fleet flip red and back to green in real time.
+
+### Incident lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> open: detector classifies event
+    open --> diagnosed: Gemini root-cause
+    diagnosed --> decided: policy engine
+    decided --> resolved: remediate (retry / auto-fix)
+    decided --> escalated: high severity
+    decided --> quarantined: pii_leak
+    resolved --> [*]
+    escalated --> [*]
+    quarantined --> [*]
+```
+
+### Supervisor reasoning loop
+
+```mermaid
+sequenceDiagram
+    participant D as Detector
+    participant F as Firestore
+    participant S as Aegis Supervisor (ADK)
+    participant G as Gemini
+    participant U as Dashboard
+    D->>F: save incident (open)
+    S->>F: get_open_incidents()
+    F-->>S: [incident, ...]
+    S->>G: diagnose(incident)
+    G-->>S: root cause + recommended action
+    S->>S: decide_action() policy gate
+    S->>F: remediate() -> update status
+    S->>F: write_postmortem()
+    F-->>U: live fleet status (red -> green)
+```
 
 ---
 
@@ -134,8 +181,13 @@ pytest tests/ -v
 ## Incident model
 
 - **Lifecycle:** `open → diagnosed → decided → resolved / escalated`
-- **Classification:** tool error → `tool_failure`; cost > 1.0 or tokens > 10000 → `budget_exceeded`; PII → `pii_leak`; confidence < 0.5 → `low_confidence`
-- **Decision policy:** `pii_leak` → quarantine; high severity → escalate; safe retry → retry; otherwise follow the model's recommended action
+
+| Signal | Classified as | Decision |
+| --- | --- | --- |
+| tool error | `tool_failure` | retry if safe |
+| cost > 1.0 or tokens > 10000 | `budget_exceeded` | escalate if high severity |
+| PII detected | `pii_leak` | quarantine |
+| confidence < 0.5 | `low_confidence` | follow model's recommended action |
 
 ---
 
