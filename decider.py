@@ -1,18 +1,22 @@
 #!/usr/bin/env python
-"""decider.py - Applies a rule-based policy to choose a remediation action.
+"""decider.py - Decider sub-agent: applies a rule-based policy to choose an action.
 
-The module also exposes :func:`decide_action` which reads from and writes back
-to Firestore, making it directly callable by the ADK agent tools wrapper.
+The Decider is one of the specialist sub-agents the Aegis supervisor
+orchestrates. It reads a diagnosed incident, applies a deterministic policy,
+flags whether the chosen action must pass the human governance gate, and writes
+the decision (plus an audit-trail entry) back to Firestore.
 
 Environment variables
 ---------------------
-PROJECT_ID – GCP project (default: aegis-hackathon-506413).
+PROJECT_ID - GCP project (default: aegis-hackathon-506413).
 """
 
 import logging
 import os
 
 from google.cloud import firestore
+
+import governance
 
 logging.basicConfig(
     level=logging.INFO,
@@ -74,8 +78,9 @@ def decide(incident: dict) -> dict:
 def decide_action(incident_id: str) -> str:
     """Decide and persist the action for a single incident.
 
-    Reads the incident from Firestore, runs :func:`decide`, and writes
-    the ``decision`` field and updated ``status`` back.
+    Reads the incident from Firestore, runs :func:`decide`, flags whether the
+    action requires human approval, writes the ``decision`` field, updated
+    ``status``, and an audit entry back.
 
     Args:
         incident_id: Firestore document ID.
@@ -94,9 +99,18 @@ def decide_action(incident_id: str) -> str:
 
     incident = doc.to_dict()
     decision = decide(incident)
+    decision["requires_approval"] = governance.requires_approval(
+        decision, incident.get("diagnosis", {})
+    )
 
     doc_ref.update({"decision": decision, "status": "decided"})
 
     action = decision["action"]
+    governance.record_audit(
+        incident_id,
+        actor="decider",
+        action="decided",
+        detail=f"{action} — {decision['reason']}",
+    )
     logger.info("Decided %s → %s (%s)", incident_id, action, decision["reason"])
     return action

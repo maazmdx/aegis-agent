@@ -4,13 +4,13 @@ open incident records to Firestore.
 
 Routes
 ------
-POST /pubsub  – Pub/Sub push endpoint (JSON envelope with base64 ``data``).
-GET  /healthz – Health-check used by Cloud Run and load balancers.
+POST /pubsub  - Pub/Sub push endpoint (JSON envelope with base64 ``data``).
+GET  /healthz - Health-check used by Cloud Run and load balancers.
 
 Environment variables
 ---------------------
-PROJECT_ID  – GCP project (default: aegis-hackathon-506413).
-PORT        – TCP port to listen on (default: 8080).
+PROJECT_ID  - GCP project (default: aegis-hackathon-506413).
+PORT        - TCP port to listen on (default: 8080).
 """
 
 import base64
@@ -27,6 +27,7 @@ import diagnoser
 import decider
 import remediator
 import reporter
+import governance
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,10 +46,10 @@ def classify(event: dict) -> str | None:
     """Apply rule-based classification to an event dict.
 
     Rules are evaluated in priority order:
-    1. status == "error"  → tool_failure
-    2. cost > 1.0 or tokens > 10 000  → budget_exceeded
-    3. pii_leak == True   → pii_leak
-    4. confidence < 0.5   → low_confidence
+    1. status == "error"  -> tool_failure
+    2. cost > 1.0 or tokens > 10 000  -> budget_exceeded
+    3. pii_leak == True   -> pii_leak
+    4. confidence < 0.5   -> low_confidence
 
     Args:
         event: Raw event dictionary from a fleet agent.
@@ -78,7 +79,8 @@ def save_incident(event: dict, incident_type: str) -> str:
 
     Uses ``event_id`` as the Firestore document ID to guarantee
     natural deduplication — repeated deliveries of the same message
-    simply overwrite the same document.
+    simply overwrite the same document. Seeds the append-only audit trail
+    with a ``detected`` entry.
 
     Args:
         event:         Raw event dictionary.
@@ -101,6 +103,13 @@ def save_incident(event: dict, incident_type: str) -> str:
         "raw_event": event,
         "status": "open",
         "created_at": firestore.SERVER_TIMESTAMP,
+        "audit_log": [
+            governance.make_audit_entry(
+                "detector",
+                "detected",
+                f"{incident_type} for {event.get('agent', 'unknown')}",
+            )
+        ],
     }
 
     _db.collection(COLLECTION).document(incident_id).set(incident)

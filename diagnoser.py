@@ -1,15 +1,16 @@
 #!/usr/bin/env python
-"""diagnoser.py - Diagnoses open incidents by calling the Gemini API.
+"""diagnoser.py - Diagnoser sub-agent: root-cause analysis via the Gemini API.
 
-Given an incident ID the module fetches the Firestore document, builds a
-structured prompt, calls Gemini with retries, parses the JSON response, and
-writes the diagnosis back to Firestore.
+The Diagnoser is one of the specialist sub-agents the Aegis supervisor
+orchestrates. Given an incident ID it fetches the Firestore document, builds a
+structured prompt, calls Gemini with retries, parses the JSON response, writes
+the diagnosis back to Firestore, and records an audit-trail entry.
 
 Environment variables
 ---------------------
-PROJECT_ID    – GCP project (default: aegis-hackathon-506413).
-GEMINI_API_KEY – AI Studio API key (required; no default committed).
-MODEL         – Gemini model to use (default: gemini-3.6-flash).
+PROJECT_ID     - GCP project (default: aegis-hackathon-506413).
+GEMINI_API_KEY - AI Studio API key (required; no default committed).
+MODEL          - Gemini model to use (default: gemini-3.6-flash).
 """
 
 import json
@@ -20,6 +21,8 @@ import re
 from google import genai
 from google.cloud import firestore
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+import governance
 
 logging.basicConfig(
     level=logging.INFO,
@@ -150,5 +153,11 @@ def diagnose_incident(incident_id: str) -> dict:
         "status": "diagnosed",
         "diagnosed_at": firestore.SERVER_TIMESTAMP,
     })
+    governance.record_audit(
+        incident_id,
+        actor="diagnoser",
+        action="diagnosed",
+        detail=f"{diagnosis.get('severity', '?')} severity — {diagnosis.get('root_cause', '?')}",
+    )
     logger.info("Diagnosed %s → %s", incident_id, diagnosis.get("root_cause"))
     return diagnosis
