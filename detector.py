@@ -176,27 +176,32 @@ def pubsub_push() -> tuple[dict, int]:
         logger.error("Failed to save incident: %s", exc)
         return {"error": "Internal Server Error"}, 500
 
-    try:
-        diagnoser.diagnose_incident(incident_id)
-    except Exception as exc:
-        logger.error("Diagnosis failed: %s", exc)
+    auto_pipeline = os.environ.get("AEGIS_AUTO_PIPELINE", "false").lower() == "true"
 
-    try:
-        action = decider.decide_action(incident_id)
-    except Exception as exc:
-        logger.error("Decision failed: %s", exc)
-        action = None
-
-    if action:
+    if auto_pipeline:
         try:
-            remediator.remediate_incident(incident_id, action)
+            diagnoser.diagnose_incident(incident_id)
         except Exception as exc:
-            logger.error("Remediation failed: %s", exc)
+            logger.error("Diagnosis failed: %s", exc)
 
-    try:
-        reporter.write_postmortem(incident_id)
-    except Exception as exc:
-        logger.error("Postmortem failed: %s", exc)
+        try:
+            action = decider.decide_action(incident_id)
+        except Exception as exc:
+            logger.error("Decision failed: %s", exc)
+            action = None
+
+        if action:
+            try:
+                remediator.remediate_incident(incident_id, action)
+            except Exception as exc:
+                logger.error("Remediation failed: %s", exc)
+
+        try:
+            reporter.write_postmortem(incident_id)
+        except Exception as exc:
+            logger.error("Postmortem failed: %s", exc)
+    else:
+        logger.info("Auto-pipeline disabled; incident %s left open for ADK supervisor", incident_id)
 
     return {"status": "saved"}, 200
 

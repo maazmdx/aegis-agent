@@ -91,7 +91,7 @@ sequenceDiagram
 | Layer | Technology |
 | --- | --- |
 | Reasoning agent | Google ADK (`LlmAgent` + tools) |
-| LLM | Gemini (`gemini-3.6-flash`) via `google-genai` |
+| LLM | Gemini (`gemini-3.7-flash`) via `google-genai` |
 | Event bus | Cloud Pub/Sub |
 | State store | Cloud Firestore (Native) |
 | Services | Cloud Run (detector + dashboard) |

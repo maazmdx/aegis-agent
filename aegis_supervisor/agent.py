@@ -45,7 +45,7 @@ When invoked, you MUST follow these steps:
 """
 
 root_agent = Agent(
-    model='gemini-3.6-flash',
+    model='gemini-3.7-flash',
     name='aegis_supervisor',
     description="Supervises an AI agent fleet, orchestrating specialist sub-agents to diagnose and remediate incidents under a human-approval governance gate.",
     instruction=INSTRUCTION,

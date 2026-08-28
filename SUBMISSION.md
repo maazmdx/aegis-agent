@@ -46,7 +46,7 @@ Aegis is a **supervisor agent** built on Google ADK. It:
   `diagnose`, `decide_action`, `remediate`, `write_postmortem`, plus governance
   tools) each delegate to a specialist sub-module. The docstrings and type hints
   are written *for the model* so it knows when to call each tool.
-- **LLM:** Gemini (`gemini-3.6-flash`) via `google-genai`, behind a single
+- **LLM:** Gemini (`gemini-3.7-flash`) via `google-genai`, behind a single
   `ask_gemini()` function with Tenacity retries and a safe-default fallback so a
   bad response never crashes the loop.
 - **Event bus:** Cloud Pub/Sub (`fleet-events`) with a dead-letter topic.
