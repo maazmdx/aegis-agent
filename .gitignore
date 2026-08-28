@@ -37,3 +37,11 @@ htmlcov/
 
 # Scripts output / scratch
 scripts/__pycache__/
+
+# Supervisor deploy copies (created transiently by scripts/deploy_supervisor.sh)
+aegis_supervisor/diagnoser.py
+aegis_supervisor/decider.py
+aegis_supervisor/remediator.py
+aegis_supervisor/reporter.py
+aegis_supervisor/governance.py
+aegis_supervisor/fleet.py

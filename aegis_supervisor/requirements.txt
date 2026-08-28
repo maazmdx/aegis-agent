@@ -1,0 +1,6 @@
+google-adk
+google-genai
+google-cloud-firestore
+google-cloud-pubsub
+tenacity
+requests

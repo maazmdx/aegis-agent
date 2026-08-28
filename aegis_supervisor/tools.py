@@ -18,6 +18,11 @@ import sys
 
 # Make sibling root-level modules importable from this package directory.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# `adk deploy cloud_run` only bundles this package dir, so the root-level
+# specialist modules are copied in beside this file at deploy time (see
+# scripts/deploy_supervisor.sh). Add the package dir to the path so those
+# copies import cleanly in the deployed container.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from google.cloud import firestore  # noqa: E402 (after sys.path manipulation)
 
