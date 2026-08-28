@@ -238,10 +238,10 @@ HTML = r"""<!DOCTYPE html>
     <a href="/" class="nav-item active" id="nav-dashboard">
       <span class="material-symbols-outlined">grid_view</span> Dashboard
     </a>
-    <a href="#fleet" class="nav-item" id="nav-fleet" onclick="scrollToSection('fleet-section')">
+    <a href="#fleet" class="nav-item" id="nav-fleet" onclick="scrollToSection('fleet-section', event)">
       <span class="material-symbols-outlined">smart_toy</span> Fleet
     </a>
-    <a href="#incidents" class="nav-item" id="nav-incidents" onclick="scrollToSection('incidents')">
+    <a href="#incidents" class="nav-item" id="nav-incidents" onclick="scrollToSection('incidents', event)">
       <span class="material-symbols-outlined">warning</span> Incidents
     </a>
     <a href="/healthz" target="_blank" class="nav-item" id="nav-health">
@@ -460,7 +460,12 @@ HTML = r"""<!DOCTYPE html>
   }, 5000);
 
   // ── Sidebar navigation ────────────────────────────────────────────────────
-  function scrollToSection(id) {
+  function scrollToSection(id, event) {
+    if (event) {
+      event.preventDefault();
+      document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+    }
     var el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({behavior: 'smooth', block: 'start'});
