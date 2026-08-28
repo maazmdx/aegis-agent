@@ -44,10 +44,17 @@ def _get_client() -> genai.Client:
 
     Deferring construction lets pure helpers (parse_diagnosis, build_prompt)
     import without a valid API key, e.g. in CI unit tests.
+
+    ``vertexai=False`` is required: when this runs inside the ADK supervisor on
+    Cloud Run, the ADK runtime plus the GOOGLE_CLOUD_LOCATION / GOOGLE_API_KEY
+    env vars flip google-genai's default backend to Vertex. That would send our
+    AI Studio API key to aiplatform.googleapis.com, which rejects it with 401.
+    Pinning the backend keeps the Diagnoser on the key-based Developer API
+    (generativelanguage.googleapis.com), independent of the agent's Vertex path.
     """
     global _client
     if _client is None:
-        _client = genai.Client(api_key=GEMINI_API_KEY)
+        _client = genai.Client(api_key=GEMINI_API_KEY, vertexai=False)
     return _client
 
 
