@@ -17,7 +17,7 @@ Configured via a local `.env` (see `.env.example`, then `source .env`):
 - `LOCATION` → `us-central1`
 - `GEMINI_API_KEY` → AI Studio key used by the diagnoser
 - `GOOGLE_API_KEY` → read by the ADK; keep in sync with `GEMINI_API_KEY`
-- `MODEL` → Gemini model id (default `gemini-3.7-flash`)
+- `MODEL` → Gemini model id (default `gemini-3.1-flash-lite`)
 - `AEGIS_AUTO_APPROVE` → `"true"` (default) auto-approves gated actions for the
   fully-autonomous demo; `"false"` enforces the human governance gate
 - `SLACK_WEBHOOK_URL` → optional, for reporter.py Slack posting
@@ -28,11 +28,11 @@ Each module reads `PROJECT_ID` from the environment via
 ## The AI "brain" — two swappable paths
 1. **FREE path** (default for local dev): Google AI Studio key
    - lib: `google-genai` (`from google import genai`)
-   - model: `gemini-3.7-flash`
+   - model: `gemini-3.1-flash-lite`
    - key from env var `GEMINI_API_KEY`
 2. **CLOUD path** (for final deploy): Vertex AI
    - lib: `google-cloud-aiplatform` (vertexai)
-   - model: `gemini-3.7-flash`
+   - model: `gemini-3.1-flash-lite`
 
 Keep the diagnoser's LLM call behind a single function `ask_gemini(prompt)`
 so you can swap paths by changing only that function. Cloud clients are created

@@ -1,5 +1,6 @@
 # Virtual environment
 venv/
+.venv/
 
 # ADK runtime session data
 **/.adk/
