@@ -29,7 +29,15 @@ PROJECT_ID = os.environ.get("PROJECT_ID")
 SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 COLLECTION = "incidents"
 
-_db = firestore.Client(project=PROJECT_ID)
+_db = None
+
+
+def _get_db() -> firestore.Client:
+    """Lazily construct and cache the Firestore client (see governance._get_db)."""
+    global _db
+    if _db is None:
+        _db = firestore.Client(project=PROJECT_ID)
+    return _db
 
 
 def build_postmortem(incident: dict) -> str:
@@ -113,7 +121,7 @@ def write_postmortem(incident_id: str) -> str:
     Raises:
         ValueError: If the incident document does not exist.
     """
-    doc_ref = _db.collection(COLLECTION).document(incident_id)
+    doc_ref = _get_db().collection(COLLECTION).document(incident_id)
     doc = doc_ref.get()
 
     if not doc.exists:

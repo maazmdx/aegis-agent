@@ -27,7 +27,15 @@ logger = logging.getLogger(__name__)
 PROJECT_ID = os.environ.get("PROJECT_ID")
 COLLECTION = "incidents"
 
-_db = firestore.Client(project=PROJECT_ID)
+_db = None
+
+
+def _get_db() -> firestore.Client:
+    """Lazily construct and cache the Firestore client (see governance._get_db)."""
+    global _db
+    if _db is None:
+        _db = firestore.Client(project=PROJECT_ID)
+    return _db
 
 
 def decide(incident: dict) -> dict:
@@ -91,7 +99,7 @@ def decide_action(incident_id: str) -> str:
     Raises:
         ValueError: If the incident document does not exist.
     """
-    doc_ref = _db.collection(COLLECTION).document(incident_id)
+    doc_ref = _get_db().collection(COLLECTION).document(incident_id)
     doc = doc_ref.get()
 
     if not doc.exists:
