@@ -42,7 +42,7 @@ Aegis is a **supervisor agent** built on Google ADK. It:
 4. **Governs** — routes high-impact actions through a human approval gate
    and records every step to an append-only audit trail in Firestore.
 5. **Remediates** — retries, quarantines, or escalates automatically.
-6. **Reports** — writes a Markdown postmortem and visualizes the full agent pipeline flow on the Cloud Run Dashboard. A **Reporting Agent Chatbot** is also embedded in the dashboard, using `gemini-3.1-flash-lite` to answer questions about live incident metrics.
+6. **Reports** — writes a Markdown postmortem and visualizes the full agent pipeline flow on the Cloud Run Dashboard. A **Reporting Agent Chatbot** is also embedded in the dashboard, using `gemini-3.5-flash-lite` to answer questions about live incident metrics.
 
 ## How we built it
 
@@ -50,7 +50,7 @@ Aegis is a **supervisor agent** built on Google ADK. It:
   `diagnose`, `decide_action`, `remediate`, `write_postmortem`, plus governance
   tools) each delegate to a specialist sub-module. The docstrings and type hints
   are written *for the model* so it knows when to call each tool.
-- **LLM:** Gemini (`gemini-3.1-flash-lite`) via `google-genai`, behind a single
+- **LLM:** Gemini (`gemini-3.5-flash-lite`) via `google-genai`, behind a single
   `ask_gemini()` function with Tenacity retries and a safe-default fallback so a
   bad response never crashes the loop.
 - **Event bus:** Cloud Pub/Sub (`fleet-events`) with a dead-letter topic.

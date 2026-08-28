@@ -293,7 +293,7 @@ def chat():
         # 3. Use Gemini to reason over the data and generate the report
         from google import genai
         client = genai.Client()
-        model_name = os.environ.get("MODEL", "gemini-3.1-flash-lite")
+        model_name = os.environ.get("MODEL", "gemini-3.5-flash-lite")
         
         prompt = (
             f"You are the Aegis Reporting Agent. You have access to the live incident database.\n"

@@ -10,7 +10,7 @@ Environment variables
 ---------------------
 PROJECT_ID     - GCP project (default: aegis-hackathon-506413).
 GEMINI_API_KEY - AI Studio API key (required; no default committed).
-MODEL          - Gemini model to use (default: gemini-3.1-flash-lite).
+MODEL          - Gemini model to use (default: gemini-3.5-flash-lite).
 """
 
 import json
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ID = os.environ.get("PROJECT_ID")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-MODEL = os.environ.get("MODEL", "gemini-3.1-flash-lite")
+MODEL = os.environ.get("MODEL", "gemini-3.5-flash-lite")
 COLLECTION = "incidents"
 
 _client = None

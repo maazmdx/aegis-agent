@@ -3,7 +3,7 @@
 ## Project Overview
 Aegis is a supervisor agent designed to monitor a fleet of worker AI agents. When a worker agent fails (e.g., exceeds budget, encounters a tool error, or leaks PII), Aegis catches the failure event and triggers an autonomous Gemini-powered reasoning loop to diagnose the root cause, determine the safest policy action, remediate the issue, and generate a postmortem. 
 
-The project was built for the **All Things Agentic Hackathon** using Google ADK, Gemini 3.1 Flash Lite, Cloud Run, Cloud Pub/Sub, and Cloud Firestore.
+The project was built for the **All Things Agentic Hackathon** using Google ADK, Gemini 3.5 Flash Lite, Cloud Run, Cloud Pub/Sub, and Cloud Firestore.
 
 ---
 
@@ -38,10 +38,10 @@ flowchart LR
 
 ## 2. The Gemini Integration
 
-Aegis leverages the **`gemini-3.1-flash-lite`** model across two entirely different capabilities:
+Aegis leverages the **`gemini-3.5-flash-lite`** model across two entirely different capabilities:
 
 ### A. The Diagnoser (Supervisor Backend)
-When an incident is classified, the ADK supervisor invokes the `diagnose` tool, which uses `gemini-3.1-flash-lite` to perform a root-cause analysis.
+When an incident is classified, the ADK supervisor invokes the `diagnose` tool, which uses `gemini-3.5-flash-lite` to perform a root-cause analysis.
 - **Input:** The raw JSON event dump from the failed worker agent.
 - **Output:** A strict JSON schema containing the `root_cause`, `severity` (low/medium/high), `confidence`, and `recommended_action`.
 - **Reliability:** Built with Tenacity retries and a safe-default fallback to ensure a malformed LLM response never crashes the pipeline.

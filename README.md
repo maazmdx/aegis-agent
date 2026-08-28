@@ -2,7 +2,7 @@
 
 > Autonomous supervision for fleets of AI agents. Aegis watches other agents, detects failures, and uses a Gemini-powered [Google ADK](https://google.github.io/adk-docs/) agent to diagnose, decide, remediate, and document — with no human in the loop.
 
-Built for the **All Things Agentic Hackathon** on **Google ADK + Gemini 3.1 Flash Lite + Cloud Run**.
+Built for the **All Things Agentic Hackathon** on **Google ADK + Gemini 3.5 Flash Lite + Cloud Run**.
 
 ---
 
@@ -37,7 +37,7 @@ flowchart LR
     PS -->|push| DET[Detector<br/>Cloud Run + Flask]
     PS -.dead-letter.-> DLQ[(fleet-events-dead)]
     DET -->|classify + persist| FS[(Firestore<br/>incidents / quarantine)]
-    SUP[Aegis Supervisor<br/>Google ADK + Gemini 3.1]
+    SUP[Aegis Supervisor<br/>Google ADK + Gemini 3.5]
     SUP -->|1. get_open_incidents| FS
     SUP -->|2. diagnose| GEM[Gemini API]
     SUP -->|3. decide_action| POL{Policy Engine}
@@ -92,7 +92,7 @@ sequenceDiagram
 | Layer | Technology |
 | --- | --- |
 | Reasoning agent | Google ADK (`LlmAgent` + tools) |
-| LLM | Gemini (`gemini-3.1-flash-lite`) via `google-genai` |
+| LLM | Gemini (`gemini-3.5-flash-lite`) via `google-genai` |
 | Event bus | Cloud Pub/Sub |
 | State store | Cloud Firestore (Native) |
 | Services | Cloud Run (detector + dashboard) |
