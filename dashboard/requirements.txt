@@ -1,3 +1,5 @@
 flask
 gunicorn
 google-cloud-firestore
+requests
+google-genai

@@ -17,12 +17,18 @@ PROJECT_ID – GCP project (default: aegis-hackathon-506413).
 PORT       – TCP port to bind (default: 8080).
 """
 
+import base64
+import json
 import logging
 import os
+import time
+import uuid
 from collections import defaultdict
 
-from flask import Flask, jsonify, render_template_string
+import requests as http_requests
+from flask import Flask, jsonify, render_template_string, request
 from google.cloud import firestore
+from google import genai
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,8 +36,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-PROJECT_ID = os.environ.get("PROJECT_ID")
+PROJECT_ID = os.environ.get("PROJECT_ID", "aegis-hackathon-506413")
 COLLECTION = "incidents"
+
+_db = None
+
+def _get_db():
+    global _db
+    if _db is None:
+        _db = firestore.Client(project=PROJECT_ID)
+    return _db
+
 ACTIVE_STATUSES = {"open", "diagnosed", "decided", "remediating"}
 AGENTS = ["invoice-agent", "support-agent", "research-agent"]
 
@@ -196,6 +211,7 @@ HTML = r"""<!DOCTYPE html>
     .tl-icon.green{background:rgba(52,168,83,.2);color:var(--google-green);}
     .tl-icon.yellow{background:rgba(251,188,4,.2);color:var(--google-yellow);}
     .tl-icon.red{background:rgba(234,67,53,.2);color:var(--google-red);}
+    .tl-icon.grey{background:rgba(155,161,166,.15);color:var(--text-muted);}
     .tl-body{}
     .tl-label{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:4px;}
     .tl-content{font-size:.88rem;line-height:1.6;color:var(--text-main);}
@@ -217,6 +233,28 @@ HTML = r"""<!DOCTYPE html>
     .setting-value{font-size:.85rem;color:var(--text-muted);font-family:monospace;}
     .settings-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;}
     .settings-close:hover{color:var(--text-main);}
+
+    /* ── Chatbot ── */
+    #chat-widget { position: fixed; bottom: 24px; right: 24px; width: 380px; max-height: 600px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 16px; display: flex; flex-direction: column; z-index: 100; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transform: translateY(120%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    #chat-widget.open { transform: translateY(0); }
+    #chat-header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border-radius: 16px 16px 0 0; }
+    #chat-header-title { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    #chat-close { background: none; border: none; color: var(--text-muted); cursor: pointer; }
+    #chat-messages { padding: 16px; flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; min-height: 300px; max-height: 400px; }
+    .msg { padding: 10px 14px; border-radius: 12px; font-size: 0.9rem; line-height: 1.4; max-width: 85%; }
+    .msg.user { background: rgba(66,133,244,0.15); color: var(--google-blue); align-self: flex-end; border-bottom-right-radius: 4px; }
+    .msg.bot { background: rgba(255,255,255,0.05); color: var(--text-main); align-self: flex-start; border-bottom-left-radius: 4px; }
+    .msg.bot p { margin: 0 0 8px 0; }
+    .msg.bot p:last-child { margin-bottom: 0; }
+    .msg.bot ul { margin: 0; padding-left: 20px; }
+    .msg.bot li { margin-bottom: 4px; }
+    .msg.bot strong { color: #fff; }
+    #chat-input-container { padding: 12px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+    #chat-input { flex-grow: 1; background: var(--bg-body); border: 1px solid var(--border); border-radius: 20px; padding: 10px 16px; color: var(--text-main); outline: none; }
+    #chat-input:focus { border-color: rgba(255,255,255,0.2); }
+    #chat-send { background: var(--google-blue); color: #fff; border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    #chat-toggle-btn { position: fixed; bottom: 24px; right: 24px; background: var(--google-blue); color: #fff; border: none; border-radius: 50%; width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 99; transition: transform 0.2s; }
+    #chat-toggle-btn:hover { transform: scale(1.05); }
   </style>
 </head>
 <body>
@@ -262,12 +300,10 @@ HTML = r"""<!DOCTYPE html>
       <span class="material-symbols-outlined" style="font-size:14px">autorenew</span>
       auto-refresh 5s
     </div>
-    <div class="icon-btn">
-      <span class="material-symbols-outlined">sensors</span>
-    </div>
-    <div class="icon-btn">
-      <span class="material-symbols-outlined" style="font-size:32px">account_circle</span>
-    </div>
+    <button class="btn-primary" style="margin:0; width:auto; padding:8px 16px; background:var(--google-red);" onclick="triggerIncident()">
+      <span class="material-symbols-outlined" style="font-size:18px">warning</span>
+      Simulate Incident
+    </button>
   </header>
 
   <div class="content">
@@ -442,19 +478,43 @@ HTML = r"""<!DOCTYPE html>
   </div>
 </div>
 
+<!-- Chatbot UI -->
+<button id="chat-toggle-btn" onclick="toggleChat()">
+  <span class="material-symbols-outlined">smart_toy</span>
+</button>
+<div id="chat-widget">
+  <div id="chat-header">
+    <div id="chat-header-title">
+      <span class="material-symbols-outlined" style="font-size: 18px; color: var(--google-blue);">smart_toy</span>
+      Reporting Agent
+    </div>
+    <button id="chat-close" onclick="toggleChat()"><span class="material-symbols-outlined">close</span></button>
+  </div>
+  <div id="chat-messages">
+    <div class="msg bot">Hi! I can compile incident metrics and summarize current alerts for you. What do you need?</div>
+  </div>
+  <div id="chat-input-container">
+    <input type="text" id="chat-input" placeholder="Ask about incidents..." onkeypress="handleChatEnter(event)">
+    <button id="chat-send" onclick="sendChatMessage()"><span class="material-symbols-outlined" style="font-size: 18px;">send</span></button>
+  </div>
+</div>
+
 <script>
   // ── Auto-refresh ──────────────────────────────────────────────────────────
   setTimeout(() => {
     const isSettingsOpen = document.getElementById('settings-overlay')?.classList.contains('open');
     const isModalOpen = document.getElementById('modal')?.classList.contains('open');
-    if (!isSettingsOpen && !isModalOpen) {
+    const isChatOpen = document.getElementById('chat-widget')?.classList.contains('open');
+    
+    if (!isSettingsOpen && !isModalOpen && !isChatOpen) {
       window.location.reload();
     } else {
-      // If modal is open, wait and try again later instead of never refreshing again
+      // If modal or chat is open, wait and try again later
       setInterval(() => {
         const checkSettings = document.getElementById('settings-overlay')?.classList.contains('open');
         const checkModal = document.getElementById('modal')?.classList.contains('open');
-        if (!checkSettings && !checkModal) window.location.reload();
+        const checkChat = document.getElementById('chat-widget')?.classList.contains('open');
+        if (!checkSettings && !checkModal && !checkChat) window.location.reload();
       }, 5000);
     }
   }, 5000);
@@ -560,71 +620,116 @@ HTML = r"""<!DOCTYPE html>
   }
 
   function renderModal(inc) {
-    const diag   = inc.diagnosis  || {};
-    const dec    = inc.decision   || {};
-    const rem    = inc.remediation|| {};
-    const pm     = (inc.postmortem|| {}).summary || '';
+    const diag   = inc.diagnosis   || {};
+    const dec    = inc.decision    || {};
+    const rem    = inc.remediation || {};
+    const pm     = (inc.postmortem || {}).summary || '';
+    const audit  = inc.audit_log   || [];
+    const status = inc.status || 'open';
 
     let steps = '';
 
-    // Step 1: Detection
-    steps += tlItem('blue', 'search', 'Detected', `
+    // ── Step 1: Detection ──────────────────────────────────────────────────
+    const detectedTs = inc.created_at && inc.created_at !== "None" ? new Date(inc.created_at).toLocaleTimeString() : '';
+    steps += tlItem('blue', 'sensors', 'Detected by Aegis Detector', `
       <dl class="kv">
         <dt>Agent</dt><dd>${inc.agent || '—'}</dd>
-        <dt>Type</dt><dd>${(inc.type || '').replace(/_/g,' ')}</dd>
-        <dt>Status at detection</dt><dd>open</dd>
+        <dt>Type</dt><dd><strong>${(inc.type||'').replace(/_/g,' ')}</strong></dd>
+        <dt>Status at detection</dt><dd>${pill('open','pill-red')}</dd>
+        ${detectedTs ? `<dt>Time</dt><dd>${detectedTs}</dd>` : ''}
       </dl>
     `);
 
-    // Step 2: Diagnosis (shown only when data present)
+    // ── Step 2: Diagnosis ─────────────────────────────────────────────────
     if (diag.root_cause) {
-      steps += tlItem('yellow', 'troubleshoot', 'Diagnosed by Gemini', `
+      const diagTs = inc.diagnosed_at && inc.diagnosed_at !== "None" ? new Date(inc.diagnosed_at).toLocaleTimeString() : '';
+      steps += tlItem('yellow', 'troubleshoot', 'Diagnosed by Gemini Flash', `
         <dl class="kv">
           <dt>Root cause</dt><dd>${diag.root_cause}</dd>
           <dt>Severity</dt><dd>${pill(diag.severity||'—', sevCls(diag.severity))}</dd>
-          <dt>Confidence</dt><dd>${((diag.confidence||0)*100).toFixed(0)}%</dd>
-          <dt>Recommended</dt><dd>${diag.recommended_action||'—'}</dd>
+          <dt>Confidence</dt><dd><strong>${((diag.confidence||0)*100).toFixed(0)}%</strong></dd>
+          <dt>Recommended action</dt><dd>${diag.recommended_action||'—'}</dd>
+          ${diagTs ? `<dt>Time</dt><dd>${diagTs}</dd>` : ''}
         </dl>
       `);
     } else {
-      steps += tlItem('yellow', 'hourglass_empty', 'Awaiting Diagnosis', '<div class="tl-content">The ADK agent has not yet diagnosed this incident.</div>');
-    }
-
-    // Step 3: Decision
-    if (dec.action) {
-      steps += tlItem('blue', 'policy', 'Decision Applied', `
-        <dl class="kv">
-          <dt>Action</dt><dd>${pill(dec.action, dec.action === 'quarantine' ? 'pill-red' : (dec.action === 'retry' ? 'pill-green' : 'pill-yellow'))}</dd>
-          <dt>Reason</dt><dd>${dec.reason||'—'}</dd>
-        </dl>
+      steps += tlItem('yellow', 'hourglass_empty', 'Diagnosis', `
+        <div class="tl-content" style="color:var(--text-muted)">
+          ${ status === 'open'
+            ? '⏳ Awaiting Gemini analysis — the ADK supervisor will diagnose this incident shortly.'
+            : 'No diagnosis data recorded.' }
+        </div>
       `);
     }
 
-    // Step 4: Remediation
-    if (rem.outcome) {
-      const remCls = rem.outcome === 'success' ? 'green' : (rem.outcome === 'skipped' ? 'yellow' : 'red');
-      steps += tlItem(remCls, 'build', 'Remediation', `
+    // ── Step 3: Governance decision ────────────────────────────────────────
+    if (dec.action) {
+      const decCls = dec.action === 'quarantine' ? 'pill-red'
+                   : dec.action === 'retry'      ? 'pill-green'
+                   : 'pill-yellow';
+      steps += tlItem('blue', 'policy', 'Governance Decision Applied', `
         <dl class="kv">
-          <dt>Outcome</dt><dd>${pill(rem.outcome, rem.outcome === 'success' ? 'pill-green' : 'pill-yellow')}</dd>
+          <dt>Action</dt><dd>${pill(dec.action.toUpperCase(), decCls)}</dd>
+          <dt>Reason</dt><dd>${dec.reason||'—'}</dd>
+          <dt>Approver</dt><dd>${dec.approver || (inc.auto_approve ? 'Auto-Approved (AEGIS_AUTO_APPROVE=true)' : 'Pending Human Review')}</dd>
+        </dl>
+      `);
+    } else if (diag.root_cause) {
+      steps += tlItem('blue', 'hourglass_empty', 'Governance Decision', `
+        <div class="tl-content" style="color:var(--text-muted)">⏳ Awaiting policy engine decision.</div>
+      `);
+    }
+
+    // ── Step 4: Remediation ────────────────────────────────────────────────
+    if (rem.outcome) {
+      const remIconColor = rem.outcome === 'success' ? 'green' : rem.outcome === 'skipped' ? 'yellow' : 'red';
+      const remPillCls   = rem.outcome === 'success' ? 'pill-green' : rem.outcome === 'skipped' ? 'pill-yellow' : 'pill-red';
+      steps += tlItem(remIconColor, 'build', 'Remediator Executed', `
+        <dl class="kv">
+          <dt>Outcome</dt><dd>${pill(rem.outcome.toUpperCase(), remPillCls)}</dd>
           <dt>Detail</dt><dd>${rem.detail||'—'}</dd>
         </dl>
       `);
+    } else if (dec.action) {
+      steps += tlItem('red', 'hourglass_empty', 'Remediation', `
+        <div class="tl-content" style="color:var(--text-muted)">⏳ Awaiting remediator execution.</div>
+      `);
     }
 
-    // Step 5: Postmortem
+    // ── Step 5: Postmortem ─────────────────────────────────────────────────
     if (pm) {
-      // Convert markdown bold to <strong>
-      const pmHtml = pm.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
-      steps += tlItem('green', 'description', 'Postmortem', `<div class="tl-content">${pmHtml}</div>`);
+      const pmHtml = pm.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g,'<br>');
+      steps += tlItem('green', 'description', 'Postmortem Report Generated', `<div class="tl-content">${pmHtml}</div>`);
+    } else if (rem.outcome === 'success') {
+      steps += tlItem('green', 'hourglass_empty', 'Postmortem', `
+        <div class="tl-content" style="color:var(--text-muted)">⏳ Generating postmortem report…</div>
+      `);
+    }
+
+    // ── Audit trail (extra entries beyond detected) ────────────────────────
+    const extraAudit = audit.filter(e => e.actor !== 'detector' && e.action !== 'detected');
+    if (extraAudit.length > 0) {
+      const auditHtml = extraAudit.map(e => `
+        <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:.8rem;">
+          <span style="color:var(--text-muted);min-width:90px;">${e.actor||''}</span>
+          <span style="color:var(--google-blue);">${e.action||''}</span>
+          <span style="color:var(--text-main);flex:1">${e.detail||''}</span>
+        </div>
+      `).join('');
+      steps += tlItem('grey', 'receipt_long', 'Audit Trail', `
+        <div style="border:1px solid var(--border);border-radius:8px;padding:8px;margin-top:4px;max-height:120px;overflow-y:auto;">
+          ${auditHtml}
+        </div>
+      `);
     }
 
     const sev = diag.severity || '—';
     document.getElementById('modal-body').innerHTML = `
       <div class="modal-title">${(inc.type||'incident').replace(/_/g,' ')} — ${inc.agent||'unknown'}</div>
       <div class="modal-subtitle">
-        Incident ID: <code style="font-size:.75rem;opacity:.7">${inc.incident_id||inc.id||'—'}</code>
+        ID: <code style="font-size:.75rem;opacity:.7">${inc.incident_id||inc.id||'—'}</code>
         &nbsp;·&nbsp;
-        ${pill(inc.status||'—', statCls(inc.status))}
+        ${pill(status, statCls(status))}
         &nbsp;
         ${sev !== '—' ? pill(sev, sevCls(sev)) : ''}
       </div>
@@ -655,6 +760,76 @@ HTML = r"""<!DOCTYPE html>
           <div class="tl-content">${content}</div>
         </div>
       </div>`;
+  }
+
+  function triggerIncident() {
+    if(!confirm("Inject a simulated PII leak incident?")) return;
+    fetch('/api/trigger', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+         if(d.error) alert("Error: " + d.error);
+         else alert("Incident triggered successfully! It will appear shortly.");
+      })
+      .catch(e => alert("Error triggering incident"));
+  }
+
+  // ── Chatbot Functions ─────────────────────────────────────────────────────
+  function toggleChat() {
+    const widget = document.getElementById('chat-widget');
+    widget.classList.toggle('open');
+  }
+
+  function handleChatEnter(e) {
+    if (e.key === 'Enter') sendChatMessage();
+  }
+
+  async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    
+    input.value = '';
+    const msgs = document.getElementById('chat-messages');
+    
+    // Add user message
+    msgs.insertAdjacentHTML('beforeend', `<div class="msg user">${text}</div>`);
+    msgs.scrollTop = msgs.scrollHeight;
+    
+    // Add loading indicator
+    const loadingId = 'loading-' + Date.now();
+    msgs.insertAdjacentHTML('beforeend', `<div class="msg bot" id="${loadingId}">
+      <span class="material-symbols-outlined" style="animation: spin 1s linear infinite; font-size: 16px;">sync</span>
+    </div>`);
+    msgs.scrollTop = msgs.scrollHeight;
+    
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
+      });
+      
+      const data = await res.json();
+      document.getElementById(loadingId).remove();
+      
+      if (res.ok) {
+        // Convert basic markdown
+        let html = data.reply
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>')
+            .replace(/- (.*?)(<br>|$)/g, '<ul><li>$1</li></ul>')
+            .replace(/<\/ul><ul>/g, ''); // Fix consecutive ul tags
+            
+        msgs.insertAdjacentHTML('beforeend', `<div class="msg bot">${html}</div>`);
+      } else {
+        msgs.insertAdjacentHTML('beforeend', `<div class="msg bot" style="color:var(--google-red)">Error: ${data.error}</div>`);
+      }
+    } catch (err) {
+      document.getElementById(loadingId).remove();
+      msgs.insertAdjacentHTML('beforeend', `<div class="msg bot" style="color:var(--google-red)">Network error</div>`);
+    }
+    
+    msgs.scrollTop = msgs.scrollHeight;
   }
 </script>
 </body>
@@ -784,30 +959,128 @@ def incident_detail(incident_id: str):
     Args:
         incident_id: Firestore document ID.
     """
-    db = firestore.Client(project=PROJECT_ID)
+    db = _get_db()  # reuse cached client — no new connection per request
     doc = db.collection(COLLECTION).document(incident_id).get()
     if not doc.exists:
         return jsonify({"error": "not found"}), 404
 
     data = doc.to_dict()
 
-    # Strip server-side Firestore timestamp objects (not JSON-serialisable).
-    for key in ("created_at", "diagnosed_at"):
-        val = data.get(key)
-        if val is not None and hasattr(val, "isoformat"):
-            data[key] = val.isoformat()
-        elif val is not None:
-            data.pop(key, None)
+    # Serialise all Firestore timestamp objects (not JSON-serialisable).
+    def _ts(val):
+        if val is None:
+            return None
+        if hasattr(val, "isoformat"):
+            return val.isoformat()
+        return str(val)
 
-    # Ensure incident_id is present in the payload.
+    data["created_at"]   = _ts(data.get("created_at"))
+    data["diagnosed_at"] = _ts(data.get("diagnosed_at"))
+
+    # Serialise timestamps inside audit_log entries.
+    for entry in data.get("audit_log", []):
+        if isinstance(entry, dict) and "ts" in entry:
+            entry["ts"] = _ts(entry["ts"])
+
     data.setdefault("incident_id", incident_id)
     return jsonify(data)
+
+@app.route("/api/trigger", methods=["POST"])
+def trigger_incident():
+    """Trigger a simulated PII-leak incident by pushing directly to the local detector.
+
+    This bypasses Google Cloud Pub/Sub so the full triage pipeline can be
+    tested locally without any cloud routing.
+    """
+    try:
+        event = {
+            "event_id": str(uuid.uuid4()),
+            "agent": "support-agent",
+            "status": "success",
+            "tokens": 800,
+            "cost": 0.10,
+            "tool_call": "lookup_customer",
+            "confidence": 0.95,
+            "pii_leak": True,
+            "timestamp": time.time(),
+        }
+        # Wrap in a standard Pub/Sub push envelope so detector.py can decode it.
+        payload = json.dumps(event).encode("utf-8")
+        envelope = {"message": {"data": base64.b64encode(payload).decode("utf-8")}}
+
+        detector_url = os.environ.get("DETECTOR_URL", "http://localhost:8080")
+        resp = http_requests.post(
+            f"{detector_url}/pubsub",
+            json=envelope,
+            timeout=60,
+        )
+        if resp.ok:
+            return jsonify({"status": "Incident injected and triage pipeline triggered"}), 200
+        else:
+            return jsonify({"error": f"Detector returned {resp.status_code}: {resp.text}"}), 502
+    except Exception as exc:
+        logger.error("trigger_incident error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
 
 
 @app.route("/healthz")
 def healthz():
     """Health-check endpoint."""
     return jsonify({"healthy": True})
+
+
+@app.route("/api/chat", methods=["POST"])
+def chat():
+    """Reporting Agent: Compiles incidents from Firestore and uses Gemini to generate a report."""
+    try:
+        user_msg = request.json.get("message", "")
+        if not user_msg:
+            return jsonify({"error": "Empty message"}), 400
+        
+        # 1. Invoke Tool: Fetch all incidents from Firestore
+        db = _get_db()
+        docs = db.collection(COLLECTION).stream()
+        
+        # 2. Compile data context for the agent
+        compiled_data = []
+        for doc in docs:
+            d = doc.to_dict()
+            compiled_data.append({
+                "id": d.get("incident_id", doc.id),
+                "agent": d.get("agent"),
+                "type": d.get("type"),
+                "status": d.get("status"),
+                "severity": d.get("diagnosis", {}).get("severity", "unknown")
+            })
+            
+        import json
+        context_str = json.dumps(compiled_data, indent=2)
+        
+        # 3. Use Gemini to reason over the data and generate the report
+        from google import genai
+        client = genai.Client()
+        model_name = os.environ.get("MODEL", "gemini-3.1-flash-lite")
+        
+        prompt = (
+            f"You are the Aegis Reporting Agent. You have access to the live incident database.\n"
+            f"Here is the current live data of all incidents in the system:\n"
+            f"```json\n{context_str}\n```\n\n"
+            f"The user has asked: '{user_msg}'\n\n"
+            f"Write a concise, professional report or answer based ONLY on the data provided above. "
+            f"Use markdown formatting, bullet points, and highlight key metrics. "
+            f"Do not hallucinate any data not in the JSON."
+        )
+        
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+        )
+        
+        return jsonify({"reply": response.text}), 200
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(exc)}), 500
 
 
 # ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ Aegis is a **supervisor agent**. It ingests events from a fleet of worker agents
 2. **Decides** an action against a policy (retry, escalate, quarantine, follow recommendation)
 3. **Remediates** automatically
 4. **Writes a postmortem** and updates a live dashboard
+5. **Answers Questions** via a Chatbot Reporting Agent that reads real-time incident logs.
 
 All of this happens in the background, driven by the agent — not by hard-coded scripts.
 
@@ -36,7 +37,7 @@ flowchart LR
     PS -->|push| DET[Detector<br/>Cloud Run + Flask]
     PS -.dead-letter.-> DLQ[(fleet-events-dead)]
     DET -->|classify + persist| FS[(Firestore<br/>incidents / quarantine)]
-    SUP[Aegis Supervisor<br/>Google ADK + Gemini 3.6]
+    SUP[Aegis Supervisor<br/>Google ADK + Gemini 3.7]
     SUP -->|1. get_open_incidents| FS
     SUP -->|2. diagnose| GEM[Gemini API]
     SUP -->|3. decide_action| POL{Policy Engine}
@@ -47,7 +48,7 @@ flowchart LR
     SEC -.-> DET
 ```
 
-**Flow:** worker agents emit events → Pub/Sub → the **detector** (a Pub/Sub push endpoint) classifies and stores incidents in Firestore → the **Aegis supervisor** (an ADK `LlmAgent` with tools) triages every open incident → the **dashboard** shows the fleet flip red and back to green in real time.
+**Flow:** worker agents emit events → Pub/Sub → the **detector** (a Pub/Sub push endpoint) classifies and stores incidents in Firestore → the **Aegis supervisor** (an ADK `LlmAgent` with tools) triages every open incident → the **dashboard** shows the fleet flip red and back to green in real time while a **Reporting Chatbot** allows admins to query incident metrics.
 
 ### Incident lifecycle
 
@@ -91,7 +92,7 @@ sequenceDiagram
 | Layer | Technology |
 | --- | --- |
 | Reasoning agent | Google ADK (`LlmAgent` + tools) |
-| LLM | Gemini (`gemini-3.7-flash`) via `google-genai` |
+| LLM | Gemini (`gemini-3.1-flash-lite`) via `google-genai` |
 | Event bus | Cloud Pub/Sub |
 | State store | Cloud Firestore (Native) |
 | Services | Cloud Run (detector + dashboard) |
@@ -159,15 +160,16 @@ export LOCATION="us-central1"
 # 1. seed a clean, realistic demo dataset
 python scripts/seed_demo.py
 
-# 2. start the detector (Pub/Sub push endpoint)
-python detector.py                 # http://localhost:8080
+# 2. start the detector (with autonomous pipeline enabled)
+AEGIS_AUTO_PIPELINE=true python detector.py  # http://localhost:8080
 
 # 3. start the dashboard
 PORT=8081 python dashboard/main.py  # http://localhost:8081
 
-# 4. inject a failure, then let the supervisor triage it
-python trigger.py pii
-adk run aegis_supervisor           # then type: Triage all open incidents
+# 4. inject a failure; the supervisor triages it asynchronously in the background
+# Option A: Click "Simulate Incident" on the dashboard UI at http://localhost:8081
+# Option B: Trigger it locally via curl
+curl -X POST http://localhost:8081/api/trigger
 ```
 
 ### Test
