@@ -38,8 +38,20 @@ logger = logging.getLogger(__name__)
 PROJECT_ID = os.environ.get("PROJECT_ID")
 COLLECTION = "incidents"
 
-_db = firestore.Client(project=PROJECT_ID)
+_db = None
 app = Flask(__name__)
+
+
+def _get_db() -> firestore.Client:
+    """Lazily construct and cache the Firestore client.
+
+    Deferring construction keeps :func:`classify` importable without Google
+    Cloud credentials (e.g. in CI unit tests).
+    """
+    global _db
+    if _db is None:
+        _db = firestore.Client(project=PROJECT_ID)
+    return _db
 
 
 def classify(event: dict) -> str | None:
@@ -112,7 +124,7 @@ def save_incident(event: dict, incident_type: str) -> str:
         ],
     }
 
-    _db.collection(COLLECTION).document(incident_id).set(incident)
+    _get_db().collection(COLLECTION).document(incident_id).set(incident)
     logger.info("Incident saved: %s for %s", incident_type, event.get("agent"))
     return incident_id
 

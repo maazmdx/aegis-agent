@@ -35,8 +35,28 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 MODEL = os.environ.get("MODEL", "gemini-3.6-flash")
 COLLECTION = "incidents"
 
-_client = genai.Client(api_key=GEMINI_API_KEY)
-_db = firestore.Client(project=PROJECT_ID)
+_client = None
+_db = None
+
+
+def _get_client() -> genai.Client:
+    """Lazily construct and cache the Gemini client.
+
+    Deferring construction lets pure helpers (parse_diagnosis, build_prompt)
+    import without a valid API key, e.g. in CI unit tests.
+    """
+    global _client
+    if _client is None:
+        _client = genai.Client(api_key=GEMINI_API_KEY)
+    return _client
+
+
+def _get_db() -> firestore.Client:
+    """Lazily construct and cache the Firestore client."""
+    global _db
+    if _db is None:
+        _db = firestore.Client(project=PROJECT_ID)
+    return _db
 
 # Used when Gemini fails or returns unparseable output.
 _SAFE_DIAGNOSIS: dict = {
@@ -57,7 +77,7 @@ def ask_gemini(prompt: str) -> str:
     Returns:
         Raw text response from the model.
     """
-    response = _client.models.generate_content(
+    response = _get_client().models.generate_content(
         model=MODEL,
         contents=prompt,
         config={
@@ -132,7 +152,7 @@ def diagnose_incident(incident_id: str) -> dict:
     Raises:
         ValueError: If the incident document does not exist.
     """
-    doc_ref = _db.collection(COLLECTION).document(incident_id)
+    doc_ref = _get_db().collection(COLLECTION).document(incident_id)
     doc = doc_ref.get()
 
     if not doc.exists:

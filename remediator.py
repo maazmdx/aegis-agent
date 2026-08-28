@@ -37,7 +37,15 @@ logger = logging.getLogger(__name__)
 PROJECT_ID = os.environ.get("PROJECT_ID")
 COLLECTION = "incidents"
 
-_db = firestore.Client(project=PROJECT_ID)
+_db = None
+
+
+def _get_db() -> firestore.Client:
+    """Lazily construct and cache the Firestore client."""
+    global _db
+    if _db is None:
+        _db = firestore.Client(project=PROJECT_ID)
+    return _db
 
 
 def remediate_retry(incident: dict) -> dict:
@@ -76,7 +84,7 @@ def remediate_quarantine(incident: dict) -> dict:
     agent = incident.get("agent", "unknown-agent")
     reason = incident.get("decision", {}).get("reason", "quarantined")
 
-    _db.collection("quarantine").document(agent).set({
+    _get_db().collection("quarantine").document(agent).set({
         "agent": agent,
         "at": firestore.SERVER_TIMESTAMP,
         "reason": reason,
@@ -134,7 +142,7 @@ def remediate_incident(incident_id: str, action: str) -> dict:
     Raises:
         ValueError: If the incident document does not exist.
     """
-    doc_ref = _db.collection(COLLECTION).document(incident_id)
+    doc_ref = _get_db().collection(COLLECTION).document(incident_id)
     doc = doc_ref.get()
 
     if not doc.exists:

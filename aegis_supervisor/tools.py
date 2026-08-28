@@ -30,7 +30,15 @@ import governance  # noqa: E402
 PROJECT_ID = os.environ.get("PROJECT_ID")
 COLLECTION = "incidents"
 
-_db = firestore.Client(project=PROJECT_ID)
+_db = None
+
+
+def _get_db() -> firestore.Client:
+    """Lazily construct and cache the Firestore client."""
+    global _db
+    if _db is None:
+        _db = firestore.Client(project=PROJECT_ID)
+    return _db
 
 
 def get_open_incidents() -> list[dict]:
@@ -40,7 +48,7 @@ def get_open_incidents() -> list[dict]:
         List of incident dictionaries, each containing at minimum
         ``incident_id``, ``agent``, ``type``, and ``status``.
     """
-    docs = _db.collection(COLLECTION).where("status", "==", "open").stream()
+    docs = _get_db().collection(COLLECTION).where("status", "==", "open").stream()
     return [doc.to_dict() for doc in docs]
 
 
@@ -115,7 +123,7 @@ def get_incidents_awaiting_approval() -> list[dict]:
     Returns:
         List of incident dictionaries with status ``"awaiting_approval"``.
     """
-    docs = _db.collection(COLLECTION).where(
+    docs = _get_db().collection(COLLECTION).where(
         "status", "==", "awaiting_approval"
     ).stream()
     return [doc.to_dict() for doc in docs]
@@ -155,7 +163,7 @@ def get_audit_trail(incident_id: str) -> list[dict]:
     Raises:
         ValueError: If the incident document does not exist.
     """
-    doc = _db.collection(COLLECTION).document(incident_id).get()
+    doc = _get_db().collection(COLLECTION).document(incident_id).get()
     if not doc.exists:
         raise ValueError(f"Incident {incident_id} not found")
     return doc.to_dict().get("audit_log", [])

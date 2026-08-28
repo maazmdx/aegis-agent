@@ -25,8 +25,22 @@ logger = logging.getLogger(__name__)
 PROJECT_ID = os.environ.get("PROJECT_ID")
 TOPIC_ID = "fleet-events"
 
-_publisher = pubsub_v1.PublisherClient()
-_topic_path = _publisher.topic_path(PROJECT_ID, TOPIC_ID)
+_publisher = None
+_topic_path = None
+
+
+def _get_publisher() -> tuple[pubsub_v1.PublisherClient, str]:
+    """Lazily construct and cache the Pub/Sub publisher and topic path.
+
+    Deferring construction keeps :func:`emit` and the agent helpers importable
+    without Google Cloud credentials (e.g. when the remediator is imported in
+    CI unit tests).
+    """
+    global _publisher, _topic_path
+    if _publisher is None:
+        _publisher = pubsub_v1.PublisherClient()
+        _topic_path = _publisher.topic_path(PROJECT_ID, TOPIC_ID)
+    return _publisher, _topic_path
 
 
 def emit(agent: str, status: str, extra: dict | None = None) -> dict:
@@ -55,7 +69,8 @@ def emit(agent: str, status: str, extra: dict | None = None) -> dict:
         event.update(extra)
 
     data = json.dumps(event).encode("utf-8")
-    msg_id = _publisher.publish(_topic_path, data).result()
+    publisher, topic_path = _get_publisher()
+    msg_id = publisher.publish(topic_path, data).result()
     logger.info("%s | %s | msg_id=%s", agent, status, msg_id)
     return event
 
@@ -121,7 +136,8 @@ def main() -> None:
     signal.signal(signal.SIGINT, _signal_handler)
     signal.signal(signal.SIGTERM, _signal_handler)
 
-    logger.info("Fleet simulator publishing to %s", _topic_path)
+    _, topic_path = _get_publisher()
+    logger.info("Fleet simulator publishing to %s", topic_path)
     while True:
         invoice_agent()
         support_agent()

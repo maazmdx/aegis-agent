@@ -37,7 +37,20 @@ COLLECTION = "incidents"
 # High-impact actions that must pass the governance gate before execution.
 GATED_ACTIONS = {"escalate", "quarantine"}
 
-_db = firestore.Client(project=PROJECT_ID)
+_db = None
+
+
+def _get_db() -> firestore.Client:
+    """Lazily construct and cache the Firestore client.
+
+    Deferring construction keeps the pure helper functions in this module
+    importable in environments without Google Cloud credentials (e.g. CI unit
+    tests), while still reusing a single client at runtime.
+    """
+    global _db
+    if _db is None:
+        _db = firestore.Client(project=PROJECT_ID)
+    return _db
 
 
 def auto_approve_enabled() -> bool:
@@ -117,7 +130,7 @@ def record_audit(
         The audit entry that was appended.
     """
     entry = make_audit_entry(actor, action, detail, extra)
-    _db.collection(COLLECTION).document(incident_id).update(
+    _get_db().collection(COLLECTION).document(incident_id).update(
         {"audit_log": firestore.ArrayUnion([entry])}
     )
     logger.info("[audit] %s %s: %s", actor, action, detail)
@@ -143,7 +156,7 @@ def request_approval(incident_id: str, decision: dict) -> dict:
         "reason": decision.get("reason"),
         "requested_at": time.time(),
     }
-    _db.collection(COLLECTION).document(incident_id).update(
+    _get_db().collection(COLLECTION).document(incident_id).update(
         {"approval": approval, "status": "awaiting_approval"}
     )
     record_audit(
@@ -172,7 +185,7 @@ def resolve_approval(
     Raises:
         ValueError: If the incident or a pending approval does not exist.
     """
-    doc_ref = _db.collection(COLLECTION).document(incident_id)
+    doc_ref = _get_db().collection(COLLECTION).document(incident_id)
     doc = doc_ref.get()
     if not doc.exists:
         raise ValueError(f"Incident {incident_id} not found")
