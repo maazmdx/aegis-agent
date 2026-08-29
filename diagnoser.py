@@ -54,7 +54,7 @@ def _get_client() -> genai.Client:
     """
     global _client
     if _client is None:
-        _client = genai.Client(api_key=GEMINI_API_KEY, vertexai=False)
+        _client = genai.Client(vertexai=True, project=PROJECT_ID, location=os.environ.get("GOOGLE_CLOUD_LOCATION", "global"))
     return _client
 
 
