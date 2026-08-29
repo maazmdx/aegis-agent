@@ -56,9 +56,13 @@ flowchart LR
     ROOT -->|remediate + postmortem| FS
     FS --> DASH["Fleet Dashboard + Chatbot<br/>Cloud Run · Flask · Chart.js"]
     DASH -->|/api/chat| GEM
-​
-Flow: worker agents emit events → Pub/Sub → the detector (a Cloud Run service) classifies each event and stores an incident in Firestore → the Aegis supervisor (an ADK LlmAgent with function tools) triages every open incident, calling Gemini on Vertex AI to diagnose and a policy/governance layer to decide → the dashboard shows the fleet flip red and back to green in real time, and a reporting chatbot lets admins query incident metrics in natural language.
-Agent & tools
+```
+
+**Flow:** worker agents emit events → **Pub/Sub** → the **detector** (a Cloud Run service) classifies each event and stores an incident in **Firestore** → the **Aegis supervisor** (an ADK `LlmAgent` with function tools) triages every open incident, calling **Gemini on Vertex AI** to diagnose and a policy/governance layer to decide → the **dashboard** shows the fleet flip red and back to green in real time, and a **reporting chatbot** lets admins query incident metrics in natural language.
+
+### Agent & tools
+
+```mermaid
 flowchart LR
     ROOT["root_agent · LlmAgent<br/>aegis_supervisor/agent.py"]
     subgraph TOOLS["ADK tools · aegis_supervisor/tools.py"]
@@ -81,40 +85,11 @@ flowchart LR
     t5 --> M5["reporter.py<br/>postmortem"]
     M4 --> FS
     M5 --> FS
-ADK tools · aegis_supervisor/tools.py
+```
 
-get_open_incidents()
+### Incident lifecycle
 
-diagnose()
-
-decide_action()
-
-remediate()
-
-write_postmortem()
-
-root_agent · LlmAgent
-aegis_supervisor/agent.py
-
-Firestore
-
-diagnoser.py
-Gemini root-cause
-
-decider.py
-policy engine
-
-governance.py
-approval gate
-
-remediator.py
-actions
-
-reporter.py
-postmortem
-
-​
-Incident lifecycle
+```mermaid
 stateDiagram-v2
     [*] --> open: detector classifies event
     open --> diagnosed: Gemini root-cause (diagnoser)
@@ -125,32 +100,11 @@ stateDiagram-v2
     resolved --> [*]
     escalated --> [*]
     quarantined --> [*]
-open
+```
 
-diagnosed
+### Supervisor reasoning loop
 
-decided
-
-resolved
-
-escalated
-
-quarantined
-
-detector classifies event
-
-Gemini root-cause (diagnoser)
-
-policy engine (decider)
-
-remediate — retry / auto-fix
-
-high severity
-
-pii_leak
-
-​
-Supervisor reasoning loop
+```mermaid
 sequenceDiagram
     autonumber
     participant D as Detector
@@ -174,48 +128,11 @@ sequenceDiagram
     F-->>U: live fleet status (red → green)
     U->>G: /api/chat incident report
     G-->>U: natural-language summary
-Dashboard
-Governance
-Gemini · Vertex AI
-Aegis Supervisor
-Firestore
-Detector
-Dashboard
-Governance
-Gemini · Vertex AI
-Aegis Supervisor
-Firestore
-Detector
-loop
-[for each open incident]
-save incident (status = open)
-1
-get_open_incidents()
-2
-[incident, ...]
-3
-diagnose(incident)
-4
-root cause + severity + action
-5
-decide_action() — policy
-6
-check approval (AEGIS_AUTO_APPROVE)
-7
-approved / hold
-8
-remediate() — update status
-9
-write_postmortem() + audit_log
-10
-live fleet status (red → green)
-11
-/api/chat incident report
-12
-natural-language summary
-13
-​
-Cloud deployment topology
+```
+
+### Cloud deployment topology
+
+```mermaid
 flowchart TB
     subgraph GCP["Google Cloud · project aegis-hackathon-506413"]
         subgraph CR["Cloud Run · us-east1"]
@@ -237,59 +154,30 @@ flowchart TB
     S1 --> VX
     S3 --> VX
     SA["Compute Service Account (ADC)<br/>aiplatform.user · datastore.user<br/>pubsub.publisher · secretAccessor"] -.-> CR
-Google Cloud · project aegis-hackathon-506413
+```
 
-Cloud Run · us-east1
+---
 
-aegis-supervisor
-ADK + Web UI
+## Tech stack
 
-aegis-detector
+| Layer | Technology |
+| --- | --- |
+| Reasoning agent | Google ADK (`LlmAgent` + function tools) |
+| LLM | Gemini (`gemini-3.5-flash-lite`) via `google-genai` on **Vertex AI** |
+| Auth | Application Default Credentials (Cloud Run service account) — no API key in production |
+| Event bus | Cloud Pub/Sub (with dead-letter topic) |
+| State store | Cloud Firestore (Native mode) |
+| Services | Cloud Run — supervisor, detector, dashboard |
+| Web | Flask, Material Design 3 UI, Chart.js |
+| Governance | Optional human-in-the-loop approval gate (`AEGIS_AUTO_APPROVE`) |
+| Reliability | Tenacity retries, Pub/Sub dead-letter topic |
+| CI | GitHub Actions (`.github/workflows/ci.yml`) running `pytest` |
 
-aegis-dashboard
+---
 
-Pub/Sub · fleet-events
+## Repository layout
 
-Pub/Sub · fleet-events-dead
-
-Firestore Native · us-central1
-incidents · quarantine
-
-Vertex AI
-Gemini 3.5 Flash-Lite
-
-Secret Manager
-gemini-api-key (legacy)
-
-Compute Service Account (ADC)
-aiplatform.user · datastore.user
-pubsub.publisher · secretAccessor
-
-​
-Tech stack
-Layer
-Technology
-Reasoning agent
-Google ADK (LlmAgent  • function tools)
-LLM
-Gemini (gemini-3.5-flash-lite) via google-genai on Vertex AI
-Auth
-Application Default Credentials (Cloud Run service account) — no API key in production
-Event bus
-Cloud Pub/Sub (with dead-letter topic)
-State store
-Cloud Firestore (Native mode)
-Services
-Cloud Run — supervisor, detector, dashboard
-Web
-Flask, Material Design 3 UI, Chart.js
-Governance
-Optional human-in-the-loop approval gate (AEGIS_AUTO_APPROVE)
-Reliability
-Tenacity retries, Pub/Sub dead-letter topic
-CI
-GitHub Actions (.github/workflows/ci.yml) running pytest
-Repository layout
+```text
 aegis-agent/
 ├─ aegis_supervisor/          # Google ADK agent package (deployed as aegis-supervisor)
 │  ├─ agent.py                # root_agent (LlmAgent, Gemini 3.5 Flash-Lite via Vertex AI)
@@ -325,32 +213,51 @@ aegis-agent/
 ├─ .github/workflows/ci.yml
 ├─ .env.example
 └─ README.md
-​
-Getting started
-Prerequisites
-Python 3.12+
-A Google Cloud project with Firestore (Native mode), Pub/Sub, and the Vertex AI API enabled
-gcloud CLI authenticated to that project
-Setup
+```
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- Python 3.12+
+- A Google Cloud project with **Firestore (Native mode)**, **Pub/Sub**, and the **Vertex AI API** enabled
+- `gcloud` CLI authenticated to that project
+
+### Setup
+
+```bash
 git clone https://github.com/maazmdx/aegis-agent.git
 cd aegis-agent
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-​
-Configure environment
-Aegis uses Vertex AI with Application Default Credentials, so no API key is required. For local development, authenticate with ADC:
+```
+
+### Configure environment
+
+Aegis uses **Vertex AI with Application Default Credentials**, so no API key is required. For local development, authenticate with ADC:
+
+```bash
 gcloud auth application-default login
-​
-Then create a .env (never commit it — see .env.example):
+```
+
+Then create a `.env` (never commit it — see `.env.example`):
+
+```bash
 export PROJECT_ID="your-gcp-project"
 export GOOGLE_CLOUD_LOCATION="global"     # Vertex AI location for Gemini
 export MODEL="gemini-3.5-flash-lite"
 export AEGIS_AUTO_APPROVE="true"          # set "false" to require human approval
-​
-Under the hood the client is created with
-genai.Client(vertexai=True, project=PROJECT_ID, location=os.environ.get("GOOGLE_CLOUD_LOCATION", "global")),
-which authenticates through the service account (in Cloud Run) or your ADC (locally). No GEMINI_API_KEY is needed.
-Run locally
+```
+
+> Under the hood the client is created with
+> `genai.Client(vertexai=True, project=PROJECT_ID, location=os.environ.get("GOOGLE_CLOUD_LOCATION", "global"))`,
+> which authenticates through the service account (in Cloud Run) or your ADC (locally). No `GEMINI_API_KEY` is needed.
+
+### Run locally
+
+```bash
 # 1. seed a clean, realistic demo dataset
 python scripts/seed_demo.py
 
@@ -364,33 +271,37 @@ PORT=8081 python dashboard/main.py    # http://localhost:8081
 #    Option A: click "Simulate Incident" on the dashboard
 #    Option B: curl the trigger endpoint
 curl -X POST http://localhost:8081/api/trigger
-​
-Test
+```
+
+### Test
+
+```bash
 pytest -v
-​
-Incident model
-Lifecycle: open → diagnosed → decided → resolved / escalated / quarantined
-Signal
-Classified as
-Decision
-tool error
-tool_failure
-retry if safe
-cost > 1.0 or tokens > 10000
-budget_exceeded
-escalate if high severity
-PII detected
-pii_leak
-quarantine
-confidence < 0.5
-low_confidence
-follow the model's recommended action
-otherwise
-healthy
-no action
-Every incident stores an immutable audit_log — an ordered list of {action, actor, at, detail} entries (e.g. diagnosed/diagnoser, decided/decider, remediated/remediator, postmortem/reporter) — so every autonomous action is fully traceable.
-Deployment (Cloud Run · us-east1)
-Gemini runs on Vertex AI, so deployments authenticate with the Cloud Run service account (no secret key required).
+```
+
+---
+
+## Incident model
+
+**Lifecycle:** `open → diagnosed → decided → resolved / escalated / quarantined`
+
+| Signal | Classified as | Decision |
+| --- | --- | --- |
+| tool error | `tool_failure` | retry if safe |
+| cost > 1.0 or tokens > 10000 | `budget_exceeded` | escalate if high severity |
+| PII detected | `pii_leak` | quarantine |
+| confidence < 0.5 | `low_confidence` | follow the model's recommended action |
+| otherwise | `healthy` | no action |
+
+Every incident stores an immutable `audit_log` — an ordered list of `{action, actor, at, detail}` entries (e.g. `diagnosed`/`diagnoser`, `decided`/`decider`, `remediated`/`remediator`, `postmortem`/`reporter`) — so every autonomous action is fully traceable.
+
+---
+
+## Deployment (Cloud Run · us-east1)
+
+Gemini runs on **Vertex AI**, so deployments authenticate with the Cloud Run service account (no secret key required).
+
+```bash
 export PROJECT_ID="aegis-hackathon-506413"
 export REGION="us-east1"
 
@@ -407,9 +318,18 @@ bash scripts/deploy_supervisor.sh
 # or manually:
 adk deploy cloud_run --project=$PROJECT_ID --region=$REGION \
   --service_name=aegis-supervisor --with_ui aegis_supervisor
-​
-Grant the Cloud Run service account the roles/aiplatform.user, roles/datastore.user, and roles/pubsub.publisher roles, and wire the detector as a Pub/Sub push subscription (fleet-events → detector) with a dead-letter topic (fleet-events-dead) for reliability.
-Continuous integration
-.github/workflows/ci.yml runs the pytest suite on every push, covering event classification, policy decisions, the governance gate, and the mean-time-to-diagnose metric.
-License
-MIT — see LICENSE.
+```
+
+Grant the Cloud Run service account the `roles/aiplatform.user`, `roles/datastore.user`, and `roles/pubsub.publisher` roles, and wire the detector as a Pub/Sub push subscription (`fleet-events` → detector) with a dead-letter topic (`fleet-events-dead`) for reliability.
+
+---
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs the `pytest` suite on every push, covering event classification, policy decisions, the governance gate, and the mean-time-to-diagnose metric.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
