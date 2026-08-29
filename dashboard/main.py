@@ -292,7 +292,7 @@ def chat():
         
         # 3. Use Gemini to reason over the data and generate the report
         from google import genai
-        client = genai.Client()
+        client = genai.Client(vertexai=True, project=os.environ.get("PROJECT_ID"), location=os.environ.get("GOOGLE_CLOUD_LOCATION", "global"))
         model_name = os.environ.get("MODEL", "gemini-3.5-flash-lite")
         
         prompt = (
