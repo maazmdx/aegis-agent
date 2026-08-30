@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 50" width="160" height="50">
+  <circle cx="15" cy="25" r="7" fill="#65A65B" />
+  <text x="32" y="37" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="bold" font-size="38" letter-spacing="-1">
+    <tspan fill="#4285F4">A</tspan><tspan fill="#EA4335">e</tspan><tspan fill="#FBBC05">g</tspan><tspan fill="#4285F4">i</tspan><tspan fill="#34A853">s</tspan>
+  </text>
+</svg>

@@ -1,6 +1,7 @@
 <div align="center">
 
-# 🛡️ AEGIS
+<br>
+<img src="aegis_logo.svg" alt="Aegis" height="60">
 
 ### Fortified Enterprise Fleet
 
