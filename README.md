@@ -8,7 +8,8 @@
 
 <br>
 
-[![WATCH DEMO](https://img.shields.io/badge/▶_WATCH_DEMO-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://aegis-dashboard-519547923286.us-east1.run.app)
+[![WATCH DEMO](https://img.shields.io/badge/▶_WATCH_DEMO-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/9qD82vhXaO4)
+[![DASHBOARD](https://img.shields.io/badge/🌍_DASHBOARD-0052CC?style=for-the-badge)](https://aegis-dashboard-519547923286.us-east1.run.app)
 [![ARCHITECTURE](https://img.shields.io/badge/🏗_ARCHITECTURE-1E1E2E?style=for-the-badge)](#architecture)
 [![QUICK START](https://img.shields.io/badge/🚀_QUICK_START-284B63?style=for-the-badge)](#getting-started)
 [![VERIFICATION](https://img.shields.io/badge/🧪_VERIFICATION-153243?style=for-the-badge)](#continuous-integration)
@@ -22,10 +23,10 @@ Deterministic systems authorize.
 Verification establishes truth.
 ```
 
-[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](#)
-[![Gemini](https://img.shields.io/badge/Gemini-3.5_Flash-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)](#)
-[![Vertex AI](https://img.shields.io/badge/Vertex-AI-4285F4?style=flat-square&logo=googlecloud&logoColor=white)](#)
-[![Cloud Run](https://img.shields.io/badge/Cloud-Run-4285F4?style=flat-square&logo=googlecloud&logoColor=white)](#)
+[![Python](https://img.shields.io/badge/-Python_3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](#)
+[![Gemini](https://img.shields.io/badge/-Gemini_3.5_Flash-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)](#)
+[![Vertex AI](https://img.shields.io/badge/-Vertex_AI-4285F4?style=flat-square&logo=googlecloud&logoColor=white)](#)
+[![Cloud Run](https://img.shields.io/badge/-Cloud_Run-4285F4?style=flat-square&logo=googlecloud&logoColor=white)](#)
 [![Tests](https://img.shields.io/badge/tests-4073_passing-4CAF50?style=flat-square)](#)
 [![Benchmark](https://img.shields.io/badge/benchmark-302%2F302-4CAF50?style=flat-square)](#)
 <br>
