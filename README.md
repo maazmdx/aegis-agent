@@ -1,10 +1,37 @@
-# 🛡️ Aegis — An AI Agent That Supervises AI Agents
+<div align="center">
 
-> Autonomous supervision for fleets of AI agents. Aegis watches other agents, detects failures, and uses a Gemini-powered [Google ADK](https://google.github.io/adk-docs/) agent to **diagnose → decide → remediate → document** — autonomously, with an optional human-in-the-loop approval gate.
+# 🛡️ AEGIS
 
-Built for the **All Things Agentic Hackathon** · **Google ADK + Gemini 3.5 Flash-Lite (Vertex AI) + Cloud Run**.
+### Fortified Enterprise Fleet
 
-🔗 **Live demo:** <https://aegis-dashboard-519547923286.us-east1.run.app>
+**A governed agent control plane for autonomous incident response — where AI agents reason and propose, but deterministic systems hold authorization, execution and verification.**
+
+<br>
+
+[![WATCH DEMO](https://img.shields.io/badge/▶_WATCH_DEMO-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://aegis-dashboard-519547923286.us-east1.run.app)
+[![ARCHITECTURE](https://img.shields.io/badge/🏗_ARCHITECTURE-1E1E2E?style=for-the-badge)](#architecture)
+[![QUICK START](https://img.shields.io/badge/🚀_QUICK_START-284B63?style=for-the-badge)](#getting-started)
+[![VERIFICATION](https://img.shields.io/badge/🧪_VERIFICATION-153243?style=for-the-badge)](#continuous-integration)
+
+<br>
+
+```text
+                  LLMs propose.
+Deterministic systems authorize.
+                  Tools execute.
+Verification establishes truth.
+```
+
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](#)
+[![Gemini](https://img.shields.io/badge/Gemini-3.5_Flash-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)](#)
+[![Vertex AI](https://img.shields.io/badge/Vertex-AI-4285F4?style=flat-square&logo=googlecloud&logoColor=white)](#)
+[![Cloud Run](https://img.shields.io/badge/Cloud-Run-4285F4?style=flat-square&logo=googlecloud&logoColor=white)](#)
+[![Tests](https://img.shields.io/badge/tests-4073_passing-4CAF50?style=flat-square)](#)
+[![Benchmark](https://img.shields.io/badge/benchmark-302%2F302-4CAF50?style=flat-square)](#)
+<br>
+[![Adversarial](https://img.shields.io/badge/adversarial-25%2F25_contained-4CAF50?style=flat-square)](#)
+
+</div>
 
 ---
 
