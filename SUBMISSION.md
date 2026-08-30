@@ -92,8 +92,8 @@ Worker agents ──emit──▶ Pub/Sub (fleet-events) ──push──▶ Det
 - A **governance gate + append-only audit trail** that makes the agent safe to
   actually trust.
 - A **live dashboard** that visibly flips red → green as Aegis works.
-- **100% Test Coverage** with 58/58 unit tests passing, covering classification, decision policy,
-  governance rules, and dashboard metrics.
+- **58/58 unit tests passing**, covering classification, decision policy,
+  governance rules, and detection-time (MTTD) metrics.
 
 ## What we learned
 
@@ -115,7 +115,7 @@ git clone https://github.com/maazmdx/aegis-agent.git
 cd aegis-agent
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in GEMINI_API_KEY + PROJECT_ID, then: source .env
+cp .env.example .env   # set PROJECT_ID (Vertex AI + ADC; no API key), then: source .env
 
 python scripts/seed_demo.py          # seed a realistic dataset
 AEGIS_AUTO_PIPELINE=true python detector.py  # runs autonomously on port 8080
@@ -125,9 +125,9 @@ curl -X POST http://localhost:8081/api/trigger  # inject failure; Aegis fixes it
 pytest -v                            # run the 58 core tests
 ```
 
-## Team
+## Author
 
-- _add team member names / roles here_
+- **Mohammed Maaz** ([@maazmdx](https://github.com/maazmdx)) — solo builder: agent, infrastructure, dashboard, and docs.
 
 ## License
 
