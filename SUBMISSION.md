@@ -12,8 +12,7 @@ write a postmortem.
 2. **No Brittle Scripts:** We don't rely on simple prompt chains. Aegis uses robust, typed tool calling (`LlmAgent`) and dynamically adapts to ambiguous inputs from failed workers, gracefully handling failures with safe fallbacks and retries.
 3. **Google Cloud Native (Cloud Proof):** Aegis is built entirely on GCP. We use **Cloud Run** for deployment, **Firestore** for persistent memory and state management, and **Pub/Sub** for event ingestion. (See Architecture diagram below).
 4. **Enterprise Governance (Fortified Enterprise Fleet Track):** Aegis features a secure, toggleable Human-in-the-Loop (`AEGIS_AUTO_APPROVE`) governance gate for high-impact actions (like quarantining an agent or escalating). All actions and data access are strictly logged to an append-only audit trail in Firestore, demonstrating secure enterprise data handling and access controls.
-
-- **Live dashboard:** _add your Cloud Run dashboard URL_
+- **Live dashboard:** https://aegis-dashboard-519547923286.us-east1.run.app
 - **Demo video:** _add your 2-3 min YouTube/Loom link_
 - **Repo:** https://github.com/maazmdx/aegis-agent
 
